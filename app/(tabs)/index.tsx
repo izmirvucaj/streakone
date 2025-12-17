@@ -1,98 +1,118 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, Pressable, StyleSheet, Alert, Animated } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const STORAGE_KEY = '@streak_data';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [streak, setStreak] = useState(0);
+  const [lastDate, setLastDate] = useState('');
+  const scaleAnim = useState(new Animated.Value(1))[0];
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const json = await AsyncStorage.getItem(STORAGE_KEY);
+        if (json) {
+          const data = JSON.parse(json);
+          setStreak(data.streak);
+          setLastDate(data.lastDate);
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleDone = async () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 1.1, duration: 100, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ]).start();
+
+    const today = new Date().toDateString();
+    if (today === lastDate) {
+      Alert.alert('Already done', 'You have already marked today as done!');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const newStreak = lastDate === yesterday.toDateString() ? streak + 1 : 1;
+
+    setStreak(newStreak);
+    setLastDate(today);
+
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ streak: newStreak, lastDate: today })
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  // MiniCalendar component home tab içinde
+  const renderMiniCalendar = () => {
+    const daysToShow = 7;
+    const today = new Date();
+    const datesArray = [];
+    for (let i = daysToShow - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      datesArray.push(d);
+    }
+
+    return (
+      <View style={styles.calendarContainer}>
+        {datesArray.map((date, index) => {
+          const done = date.toDateString() === lastDate;
+          const isToday = date.toDateString() === today.toDateString();
+          return (
+            <View
+              key={index}
+              style={[
+                styles.dayBox,
+                { backgroundColor: done ? '#22c55e' : '#444' },
+                isToday && { borderWidth: 2, borderColor: '#fff' },
+              ]}
+            >
+              <Text style={styles.dayText}>{date.getDate()}</Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>StreakOne</Text>
+      <Text style={styles.streak}>🔥 {streak} day streak</Text>
+
+      {renderMiniCalendar()}
+
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Pressable style={styles.button} onPress={handleDone}>
+          <Text style={styles.buttonText}>DONE TODAY</Text>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f0f0f', paddingHorizontal: 24 },
+  title: { fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 12 },
+  streak: { fontSize: 18, color: '#9ca3af', marginBottom: 32 },
+  button: { backgroundColor: '#22c55e', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12 },
+  buttonText: { color: '#0f0f0f', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
+  calendarContainer: { flexDirection: 'row', justifyContent: 'space-between', width: '90%', marginBottom: 32 },
+  dayBox: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  dayText: { color: '#fff', fontWeight: '700' },
 });
