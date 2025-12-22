@@ -1,9 +1,24 @@
 import { SafeAreaView, ScrollView, StyleSheet, View, Text } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MiniCalendarScreen() {
-  const [streak] = useState(3);
-  const [lastDate] = useState(new Date().toDateString());
+  const [doneDates, setDoneDates] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const json = await AsyncStorage.getItem('@streak_data');
+        if (json) {
+          const data = JSON.parse(json);
+          setDoneDates(data.doneDates || []);
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    loadData();
+  }, []);
 
   const renderMiniCalendar = () => {
     const daysToShow = 7;
@@ -18,7 +33,7 @@ export default function MiniCalendarScreen() {
     return (
       <View style={styles.calendarContainer}>
         {datesArray.map((date, index) => {
-          const done = date.toDateString() === lastDate;
+          const done = doneDates.includes(date.toDateString());
           const isToday = date.toDateString() === today.toDateString();
           return (
             <View
