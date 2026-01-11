@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, Animated } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, Animated, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 
@@ -7,7 +7,7 @@ const STORAGE_KEY = '@streak_data';
 
 export default function HomeScreen() {
   const [streak, setStreak] = useState(0);
-  const [lastDate, setLastDate] = useState('');
+  const [doneDates, setDoneDates] = useState<string[]>([]);
   const scaleAnim = useState(new Animated.Value(1))[0];
 
   useEffect(() => {
@@ -16,8 +16,17 @@ export default function HomeScreen() {
         const json = await AsyncStorage.getItem(STORAGE_KEY);
         if (json) {
           const data = JSON.parse(json);
-          setStreak(data.streak);
-          setLastDate(data.lastDate);
+          // Eski veri yapısını destekle (migration)
+          if (data.doneDates) {
+            setDoneDates(data.doneDates);
+            setStreak(calculateStreak(data.doneDates));
+          } else if (data.lastDate) {
+            // Eski veri yapısından yeniye geçiş
+            const dates = [data.lastDate];
+            setDoneDates(dates);
+            setStreak(data.streak || 1);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ doneDates: dates, streak: data.streak || 1 }));
+          }
         }
       } catch (e) {
         console.log(e);
@@ -26,6 +35,30 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
+  const calculateStreak = (dates: string[]): number => {
+    if (dates.length === 0) return 0;
+    
+    const sortedDates = [...dates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    let streakCount = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (let i = 0; i < sortedDates.length; i++) {
+      const checkDate = new Date(sortedDates[i]);
+      checkDate.setHours(0, 0, 0, 0);
+      const expectedDate = new Date(today);
+      expectedDate.setDate(today.getDate() - i);
+      
+      if (checkDate.getTime() === expectedDate.getTime()) {
+        streakCount++;
+      } else {
+        break;
+      }
+    }
+    
+    return streakCount;
+  };
+
   const handleDone = async () => {
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 1.1, duration: 100, useNativeDriver: true }),
@@ -33,23 +66,22 @@ export default function HomeScreen() {
     ]).start();
 
     const today = new Date().toDateString();
-    if (today === lastDate) {
+    if (doneDates.includes(today)) {
       Alert.alert('Already done', 'You have already marked today as done!');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const newStreak = lastDate === yesterday.toDateString() ? streak + 1 : 1;
+    const newDoneDates = [...doneDates, today];
+    const newStreak = calculateStreak(newDoneDates);
 
+    setDoneDates(newDoneDates);
     setStreak(newStreak);
-    setLastDate(today);
 
     try {
       await AsyncStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ streak: newStreak, lastDate: today })
+        JSON.stringify({ doneDates: newDoneDates, streak: newStreak })
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
@@ -71,14 +103,22 @@ export default function HomeScreen() {
     return (
       <View style={styles.calendarContainer}>
         {datesArray.map((date, index) => {
-          const done = date.toDateString() === lastDate;
-          const isToday = date.toDateString() === today.toDateString();
+          const dateString = date.toDateString();
+          const done = doneDates.includes(dateString);
+          const isToday = dateString === today.toDateString();
+          const isPast = date < new Date(today.toDateString());
           return (
             <View
               key={index}
               style={[
                 styles.dayBox,
-                { backgroundColor: done ? '#22c55e' : '#444' },
+                {
+                  backgroundColor: done
+                    ? '#22c55e'
+                    : isPast
+                    ? '#dc2626'
+                    : '#444',
+                },
                 isToday && { borderWidth: 2, borderColor: '#fff' },
               ]}
             >
@@ -91,23 +131,26 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>StreakOne</Text>
-      <Text style={styles.streak}>🔥 {streak} day streak</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>StreakOne</Text>
+        <Text style={styles.streak}>🔥 {streak} day streak</Text>
 
-      {renderMiniCalendar()}
+        {renderMiniCalendar()}
 
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <Pressable style={styles.button} onPress={handleDone}>
-          <Text style={styles.buttonText}>DONE TODAY</Text>
-        </Pressable>
-      </Animated.View>
-    </View>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <Pressable style={styles.button} onPress={handleDone}>
+            <Text style={styles.buttonText}>DONE TODAY</Text>
+          </Pressable>
+        </Animated.View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f0f0f', paddingHorizontal: 24 },
+  container: { flex: 1, backgroundColor: '#0f0f0f' },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   title: { fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 12 },
   streak: { fontSize: 18, color: '#9ca3af', marginBottom: 32 },
   button: { backgroundColor: '#22c55e', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12 },

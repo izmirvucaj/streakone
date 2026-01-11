@@ -1,112 +1,217 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-export default function TabTwoScreen() {
+const STORAGE_KEY = '@streak_data';
+
+export default function ExploreScreen() {
+  const [stats, setStats] = useState({
+    totalDays: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    completionRate: 0,
+  });
+
+  const loadStats = useCallback(async () => {
+    try {
+      const json = await AsyncStorage.getItem(STORAGE_KEY);
+      if (json) {
+        const data = JSON.parse(json);
+        let doneDates: string[] = [];
+        
+        if (data.doneDates) {
+          doneDates = data.doneDates;
+        } else if (data.lastDate) {
+          doneDates = [data.lastDate];
+        }
+
+        if (doneDates.length > 0) {
+          const sortedDates = [...doneDates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+          
+          // Current streak calculation
+          let currentStreak = 0;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          for (let i = 0; i < sortedDates.length; i++) {
+            const checkDate = new Date(sortedDates[i]);
+            checkDate.setHours(0, 0, 0, 0);
+            const expectedDate = new Date(today);
+            expectedDate.setDate(today.getDate() - i);
+            
+            if (checkDate.getTime() === expectedDate.getTime()) {
+              currentStreak++;
+            } else {
+              break;
+            }
+          }
+
+          // Longest streak calculation
+          let longestStreak = 1;
+          let tempStreak = 1;
+          for (let i = 1; i < sortedDates.length; i++) {
+            const prevDate = new Date(sortedDates[i - 1]);
+            const currDate = new Date(sortedDates[i]);
+            prevDate.setHours(0, 0, 0, 0);
+            currDate.setHours(0, 0, 0, 0);
+            
+            const diffTime = prevDate.getTime() - currDate.getTime();
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+            
+            if (diffDays === 1) {
+              tempStreak++;
+              longestStreak = Math.max(longestStreak, tempStreak);
+            } else {
+              tempStreak = 1;
+            }
+          }
+
+          // Completion rate (last 30 days)
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const recentDates = doneDates.filter(date => {
+            const d = new Date(date);
+            return d >= thirtyDaysAgo;
+          });
+          const completionRate = Math.round((recentDates.length / 30) * 100);
+
+          setStats({
+            totalDays: doneDates.length,
+            currentStreak,
+            longestStreak,
+            completionRate,
+          });
+        } else {
+          setStats({
+            totalDays: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            completionRate: 0,
+          });
+        }
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStats();
+    }, [loadStats])
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Statistics</Text>
+        
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <IconSymbol name="flame.fill" size={32} color="#ff6b35" />
+            <Text style={styles.statValue}>{stats.currentStreak}</Text>
+            <Text style={styles.statLabel}>Current Streak</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <IconSymbol name="trophy.fill" size={32} color="#ffd700" />
+            <Text style={styles.statValue}>{stats.longestStreak}</Text>
+            <Text style={styles.statLabel}>Longest Streak</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <IconSymbol name="checkmark.circle.fill" size={32} color="#22c55e" />
+            <Text style={styles.statValue}>{stats.totalDays}</Text>
+            <Text style={styles.statLabel}>Total Days</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <IconSymbol name="chart.bar.fill" size={32} color="#3b82f6" />
+            <Text style={styles.statValue}>{stats.completionRate}%</Text>
+            <Text style={styles.statLabel}>Last 30 Days</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>About StreakOne</Text>
+          <Text style={styles.infoText}>
+            Track your daily habits and build consistency. Mark each day as done to maintain your streak.
+          </Text>
+          <Text style={styles.infoText}>
+            Keep your streak alive by completing your task every day. Missing a day will reset your current streak.
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: '#0f0f0f',
   },
-  titleContainer: {
+  scrollContainer: {
+    padding: 24,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  statsGrid: {
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 32,
+    gap: 16,
+  },
+  statCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    width: '47%',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#fff',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  infoSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  infoTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    lineHeight: 20,
+    marginBottom: 12,
   },
 });
