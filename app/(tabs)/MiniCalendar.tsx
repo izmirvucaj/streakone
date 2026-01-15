@@ -1,30 +1,14 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadStreakData, StreakItem } from '@/utils/storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-const STORAGE_KEY = '@streak_data';
-
 export default function MiniCalendarScreen() {
-  const [doneDates, setDoneDates] = useState<string[]>([]);
+  const [streaks, setStreaks] = useState<StreakItem[]>([]);
 
   const loadData = useCallback(async () => {
-    try {
-      const json = await AsyncStorage.getItem(STORAGE_KEY);
-      if (json) {
-        const data = JSON.parse(json);
-        // Eski veri yapısını destekle (migration)
-        if (data.doneDates) {
-          setDoneDates(data.doneDates);
-        } else if (data.lastDate) {
-          setDoneDates([data.lastDate]);
-        } else {
-          setDoneDates([]);
-        }
-      }
-    } catch (e) {
-      console.log(e);
-    }
+    const loadedStreaks = await loadStreakData();
+    setStreaks(loadedStreaks);
   }, []);
 
   useEffect(() => {
@@ -38,6 +22,15 @@ export default function MiniCalendarScreen() {
     }, [loadData])
   );
 
+  // Combine all doneDates from all streaks
+  const getAllDoneDates = (): string[] => {
+    const allDates = new Set<string>();
+    streaks.forEach(streak => {
+      streak.doneDates.forEach(date => allDates.add(date));
+    });
+    return Array.from(allDates);
+  };
+
   const renderMiniCalendar = () => {
     const daysToShow = 30; // Son 30 günü göster
     const today = new Date();
@@ -50,13 +43,19 @@ export default function MiniCalendarScreen() {
       datesArray.push(d);
     }
 
+    const allDoneDates = getAllDoneDates();
+
     return (
       <View style={styles.calendarContainer}>
         {datesArray.map((date, index) => {
           const dateString = date.toDateString();
-          const done = doneDates.includes(dateString);
+          const done = allDoneDates.includes(dateString);
           const isToday = dateString === today.toDateString();
           const isPast = date < today;
+          
+          // Count how many streaks were done on this day
+          const streakCount = streaks.filter(s => s.doneDates.includes(dateString)).length;
+          
           return (
             <View
               key={index}
@@ -73,6 +72,9 @@ export default function MiniCalendarScreen() {
               ]}
             >
               <Text style={styles.dayText}>{date.getDate()}</Text>
+              {streakCount > 1 && (
+                <Text style={styles.streakCountBadge}>{streakCount}</Text>
+              )}
             </View>
           );
         })}
@@ -84,8 +86,18 @@ export default function MiniCalendarScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Calendar</Text>
-        <Text style={styles.subtitle}>Last 30 days</Text>
-        {renderMiniCalendar()}
+        <Text style={styles.subtitle}>
+          {streaks.length > 0 
+            ? `All ${streaks.length} streak${streaks.length > 1 ? 's' : ''} - Last 30 days`
+            : 'No streaks yet'}
+        </Text>
+        {streaks.length > 0 ? (
+          renderMiniCalendar()
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>Create your first streak to see the calendar!</Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -104,6 +116,36 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
-  dayBox: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  dayBox: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 10, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    position: 'relative',
+  },
   dayText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  streakCountBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#3b82f6',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    minWidth: 16,
+    textAlign: 'center',
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#9ca3af',
+    fontSize: 14,
+    textAlign: 'center',
+  },
 });

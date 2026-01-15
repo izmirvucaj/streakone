@@ -1,161 +1,288 @@
-import { useState, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, Animated, SafeAreaView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { addStreak, loadStreakData, StreakItem } from '@/utils/storage';
+import { generateStreakId, getCurrentMilestone, STREAK_COLORS } from '@/utils/streakHelpers';
 import * as Haptics from 'expo-haptics';
-
-const STORAGE_KEY = '@streak_data';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function HomeScreen() {
-  const [streak, setStreak] = useState(0);
-  const [doneDates, setDoneDates] = useState<string[]>([]);
-  const scaleAnim = useState(new Animated.Value(1))[0];
+  const [streaks, setStreaks] = useState<StreakItem[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStreakName, setNewStreakName] = useState('');
+  const router = useRouter();
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const json = await AsyncStorage.getItem(STORAGE_KEY);
-        if (json) {
-          const data = JSON.parse(json);
-          // Eski veri yapısını destekle (migration)
-          if (data.doneDates) {
-            setDoneDates(data.doneDates);
-            setStreak(calculateStreak(data.doneDates));
-          } else if (data.lastDate) {
-            // Eski veri yapısından yeniye geçiş
-            const dates = [data.lastDate];
-            setDoneDates(dates);
-            setStreak(data.streak || 1);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ doneDates: dates, streak: data.streak || 1 }));
-          }
-        }
-      } catch (e) {
-        console.log(e);
-      }
-    };
-    loadData();
+  const loadStreaks = useCallback(async () => {
+    const loadedStreaks = await loadStreakData();
+    setStreaks(loadedStreaks);
   }, []);
 
-  const calculateStreak = (dates: string[]): number => {
-    if (dates.length === 0) return 0;
-    
-    const sortedDates = [...dates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-    let streakCount = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    for (let i = 0; i < sortedDates.length; i++) {
-      const checkDate = new Date(sortedDates[i]);
-      checkDate.setHours(0, 0, 0, 0);
-      const expectedDate = new Date(today);
-      expectedDate.setDate(today.getDate() - i);
-      
-      if (checkDate.getTime() === expectedDate.getTime()) {
-        streakCount++;
-      } else {
-        break;
-      }
-    }
-    
-    return streakCount;
-  };
+  useEffect(() => {
+    loadStreaks();
+  }, [loadStreaks]);
 
-  const handleDone = async () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 1.1, duration: 100, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-    ]).start();
+  useFocusEffect(
+    useCallback(() => {
+      loadStreaks();
+    }, [loadStreaks])
+  );
 
-    const today = new Date().toDateString();
-    if (doneDates.includes(today)) {
-      Alert.alert('Already done', 'You have already marked today as done!');
+  const handleAddStreak = async () => {
+    if (!newStreakName.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
-    const newDoneDates = [...doneDates, today];
-    const newStreak = calculateStreak(newDoneDates);
+    const color = STREAK_COLORS[streaks.length % STREAK_COLORS.length];
+    const newStreak: StreakItem = {
+      id: generateStreakId(),
+      name: newStreakName.trim(),
+      doneDates: [],
+      streak: 0,
+      createdAt: new Date().toISOString(),
+      color,
+    };
 
-    setDoneDates(newDoneDates);
-    setStreak(newStreak);
-
-    try {
-      await AsyncStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ doneDates: newDoneDates, streak: newStreak })
-      );
+    const success = await addStreak(newStreak);
+    if (success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      console.log(e);
+      setNewStreakName('');
+      setShowAddModal(false);
+      loadStreaks();
     }
   };
 
-  // MiniCalendar component home tab içinde
-  const renderMiniCalendar = () => {
-    const daysToShow = 7;
-    const today = new Date();
-    const datesArray = [];
-    for (let i = daysToShow - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(today.getDate() - i);
-      datesArray.push(d);
-    }
-
-    return (
-      <View style={styles.calendarContainer}>
-        {datesArray.map((date, index) => {
-          const dateString = date.toDateString();
-          const done = doneDates.includes(dateString);
-          const isToday = dateString === today.toDateString();
-          const isPast = date < new Date(today.toDateString());
-          return (
-            <View
-              key={index}
-              style={[
-                styles.dayBox,
-                {
-                  backgroundColor: done
-                    ? '#22c55e'
-                    : isPast
-                    ? '#dc2626'
-                    : '#444',
-                },
-                isToday && { borderWidth: 2, borderColor: '#fff' },
-              ]}
-            >
-              <Text style={styles.dayText}>{date.getDate()}</Text>
-            </View>
-          );
-        })}
-      </View>
-    );
+  const handleStreakPress = (streakId: string) => {
+    router.push(`/streak/${streakId}`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>StreakOne</Text>
-        <Text style={styles.streak}>🔥 {streak} day streak</Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.title}>StreakOne</Text>
+          <Text style={styles.subtitle}>Track your habits</Text>
+        </View>
 
-        {renderMiniCalendar()}
+        {streaks.length === 0 ? (
+          <View style={styles.emptyState}>
+            <IconSymbol name="flame" size={64} color="#666" />
+            <Text style={styles.emptyText}>No streaks yet</Text>
+            <Text style={styles.emptySubtext}>Create your first streak to get started!</Text>
+          </View>
+        ) : (
+          <View style={styles.streaksList}>
+            {streaks.map((streak) => {
+              const progress = streak.targetDays 
+                ? Math.round((streak.streak / streak.targetDays) * 100) 
+                : null;
+              const currentMilestone = getCurrentMilestone(streak.streak);
+              
+              return (
+                <Pressable
+                  key={streak.id}
+                  style={[styles.streakCard, { borderLeftColor: streak.color || STREAK_COLORS[0] }]}
+                  onPress={() => handleStreakPress(streak.id)}
+                >
+                  <View style={styles.streakCardContent}>
+                    <View style={styles.streakNameRow}>
+                      <Text style={styles.streakName}>{streak.name}</Text>
+                      {currentMilestone && (
+                        <View style={[styles.milestoneBadgeSmall, { borderColor: currentMilestone.color }]}>
+                          <Text style={styles.milestoneEmojiSmall}>{currentMilestone.emoji}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.streakInfo}>
+                      <Text style={styles.streakCount}>🔥 {streak.streak}</Text>
+                      <Text style={styles.streakDays}>{streak.doneDates.length} days</Text>
+                    </View>
+                    {streak.targetDays && (
+                      <View style={styles.targetInfo}>
+                        <View style={styles.targetProgressBar}>
+                          <View 
+                            style={[
+                              styles.targetProgressFill,
+                              {
+                                width: `${Math.min(progress || 0, 100)}%`,
+                                backgroundColor: streak.color || STREAK_COLORS[0],
+                              }
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.targetText}>
+                          {progress}% • {streak.targetDays - streak.streak} days left
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <IconSymbol name="chevron.right" size={20} color="#666" />
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-          <Pressable style={styles.button} onPress={handleDone}>
-            <Text style={styles.buttonText}>DONE TODAY</Text>
+        <Pressable
+          style={styles.addButton}
+          onPress={() => setShowAddModal(true)}
+        >
+          <IconSymbol name="plus.circle.fill" size={24} color="#fff" />
+          <Text style={styles.addButtonText}>New Streak</Text>
+        </Pressable>
+      </ScrollView>
+
+      {/* Add Streak Modal */}
+      <Modal
+        visible={showAddModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              setShowAddModal(false);
+              setNewStreakName('');
+            }}
+          >
+            <Pressable
+              style={styles.modalContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.modalTitle}>Create New Streak</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., Sigara Bırakma, Ders Çalışma..."
+                placeholderTextColor="#666"
+                value={newStreakName}
+                onChangeText={setNewStreakName}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleAddStreak}
+              />
+              <View style={styles.modalButtons}>
+                <Pressable
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowAddModal(false);
+                    setNewStreakName('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalButton, styles.createButton]}
+                  onPress={handleAddStreak}
+                >
+                  <Text style={styles.createButtonText}>Create</Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </Pressable>
-        </Animated.View>
-      </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f0f' },
-  content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  title: { fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 12 },
-  streak: { fontSize: 18, color: '#9ca3af', marginBottom: 32 },
-  button: { backgroundColor: '#22c55e', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12 },
-  buttonText: { color: '#0f0f0f', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
-  calendarContainer: { flexDirection: 'row', justifyContent: 'space-between', width: '90%', marginBottom: 32 },
-  dayBox: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  dayText: { color: '#fff', fontWeight: '700' },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 100 },
+  header: { marginBottom: 24 },
+  title: { fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  subtitle: { fontSize: 16, color: '#9ca3af' },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyText: { fontSize: 20, fontWeight: '600', color: '#fff', marginTop: 16, marginBottom: 8 },
+  emptySubtext: { fontSize: 14, color: '#9ca3af', textAlign: 'center' },
+  streaksList: { gap: 12, marginBottom: 20 },
+  streakCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  streakCardContent: { flex: 1 },
+  streakNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  streakName: { fontSize: 18, fontWeight: '600', color: '#fff', flex: 1 },
+  milestoneBadgeSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  milestoneEmojiSmall: { fontSize: 14 },
+  streakInfo: { flexDirection: 'row', gap: 16, marginBottom: 8 },
+  streakCount: { fontSize: 16, fontWeight: '700', color: '#22c55e' },
+  streakDays: { fontSize: 14, color: '#9ca3af' },
+  targetInfo: { marginTop: 8 },
+  targetProgressBar: {
+    height: 4,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  targetProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  targetText: { fontSize: 11, color: '#9ca3af' },
+  addButton: {
+    backgroundColor: '#22c55e',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+  },
+  addButtonText: { color: '#0f0f0f', fontSize: 16, fontWeight: '700' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24, // Tab bar için ekstra padding
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    maxHeight: '80%',
+  },
+  modalTitle: { fontSize: 24, fontWeight: '700', color: '#fff', marginBottom: 20 },
+  input: {
+    backgroundColor: '#0f0f0f',
+    borderRadius: 12,
+    padding: 16,
+    color: '#fff',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    marginBottom: 20,
+  },
+  modalButtons: { flexDirection: 'row', gap: 12 },
+  modalButton: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
+  cancelButton: { backgroundColor: '#2a2a2a' },
+  cancelButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  createButton: { backgroundColor: '#22c55e' },
+  createButtonText: { color: '#0f0f0f', fontSize: 16, fontWeight: '700' },
 });

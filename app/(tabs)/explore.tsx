@@ -1,100 +1,60 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadStreakData } from '@/utils/storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-const STORAGE_KEY = '@streak_data';
-
 export default function ExploreScreen() {
   const [stats, setStats] = useState({
+    totalStreaks: 0,
     totalDays: 0,
-    currentStreak: 0,
-    longestStreak: 0,
+    bestStreak: 0,
+    averageStreak: 0,
     completionRate: 0,
   });
 
   const loadStats = useCallback(async () => {
-    try {
-      const json = await AsyncStorage.getItem(STORAGE_KEY);
-      if (json) {
-        const data = JSON.parse(json);
-        let doneDates: string[] = [];
-        
-        if (data.doneDates) {
-          doneDates = data.doneDates;
-        } else if (data.lastDate) {
-          doneDates = [data.lastDate];
-        }
-
-        if (doneDates.length > 0) {
-          const sortedDates = [...doneDates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-          
-          // Current streak calculation
-          let currentStreak = 0;
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          for (let i = 0; i < sortedDates.length; i++) {
-            const checkDate = new Date(sortedDates[i]);
-            checkDate.setHours(0, 0, 0, 0);
-            const expectedDate = new Date(today);
-            expectedDate.setDate(today.getDate() - i);
-            
-            if (checkDate.getTime() === expectedDate.getTime()) {
-              currentStreak++;
-            } else {
-              break;
-            }
-          }
-
-          // Longest streak calculation
-          let longestStreak = 1;
-          let tempStreak = 1;
-          for (let i = 1; i < sortedDates.length; i++) {
-            const prevDate = new Date(sortedDates[i - 1]);
-            const currDate = new Date(sortedDates[i]);
-            prevDate.setHours(0, 0, 0, 0);
-            currDate.setHours(0, 0, 0, 0);
-            
-            const diffTime = prevDate.getTime() - currDate.getTime();
-            const diffDays = diffTime / (1000 * 60 * 60 * 24);
-            
-            if (diffDays === 1) {
-              tempStreak++;
-              longestStreak = Math.max(longestStreak, tempStreak);
-            } else {
-              tempStreak = 1;
-            }
-          }
-
-          // Completion rate (last 30 days)
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          const recentDates = doneDates.filter(date => {
-            const d = new Date(date);
-            return d >= thirtyDaysAgo;
-          });
-          const completionRate = Math.round((recentDates.length / 30) * 100);
-
-          setStats({
-            totalDays: doneDates.length,
-            currentStreak,
-            longestStreak,
-            completionRate,
-          });
-        } else {
-          setStats({
-            totalDays: 0,
-            currentStreak: 0,
-            longestStreak: 0,
-            completionRate: 0,
-          });
-        }
-      }
-    } catch (e) {
-      console.log(e);
+    const streaks = await loadStreakData();
+    
+    if (streaks.length === 0) {
+      setStats({
+        totalStreaks: 0,
+        totalDays: 0,
+        bestStreak: 0,
+        averageStreak: 0,
+        completionRate: 0,
+      });
+      return;
     }
+
+    // Calculate stats from all streaks
+    const totalDays = streaks.reduce((sum, s) => sum + s.doneDates.length, 0);
+    const bestStreak = Math.max(...streaks.map(s => s.streak), 0);
+    const averageStreak = streaks.length > 0 
+      ? Math.round(streaks.reduce((sum, s) => sum + s.streak, 0) / streaks.length)
+      : 0;
+
+    // Calculate completion rate (last 30 days) - combine all streaks
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const allDoneDates = new Set<string>();
+    streaks.forEach(streak => {
+      streak.doneDates.forEach(date => {
+        const d = new Date(date);
+        if (d >= thirtyDaysAgo) {
+          allDoneDates.add(date);
+        }
+      });
+    });
+    const completionRate = Math.round((allDoneDates.size / 30) * 100);
+
+    setStats({
+      totalStreaks: streaks.length,
+      totalDays,
+      bestStreak,
+      averageStreak,
+      completionRate,
+    });
   }, []);
 
   useEffect(() => {
@@ -114,15 +74,15 @@ export default function ExploreScreen() {
         
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <IconSymbol name="flame.fill" size={32} color="#ff6b35" />
-            <Text style={styles.statValue}>{stats.currentStreak}</Text>
-            <Text style={styles.statLabel}>Current Streak</Text>
+            <IconSymbol name="list.bullet" size={32} color="#3b82f6" />
+            <Text style={styles.statValue}>{stats.totalStreaks}</Text>
+            <Text style={styles.statLabel}>Total Streaks</Text>
           </View>
 
           <View style={styles.statCard}>
             <IconSymbol name="trophy.fill" size={32} color="#ffd700" />
-            <Text style={styles.statValue}>{stats.longestStreak}</Text>
-            <Text style={styles.statLabel}>Longest Streak</Text>
+            <Text style={styles.statValue}>{stats.bestStreak}</Text>
+            <Text style={styles.statLabel}>Best Streak</Text>
           </View>
 
           <View style={styles.statCard}>
@@ -132,9 +92,15 @@ export default function ExploreScreen() {
           </View>
 
           <View style={styles.statCard}>
-            <IconSymbol name="chart.bar.fill" size={32} color="#3b82f6" />
+            <IconSymbol name="chart.bar.fill" size={32} color="#8b5cf6" />
+            <Text style={styles.statValue}>{stats.averageStreak}</Text>
+            <Text style={styles.statLabel}>Avg Streak</Text>
+          </View>
+
+          <View style={[styles.statCard, styles.fullWidthCard]}>
+            <IconSymbol name="calendar" size={32} color="#ec4899" />
             <Text style={styles.statValue}>{stats.completionRate}%</Text>
-            <Text style={styles.statLabel}>Last 30 Days</Text>
+            <Text style={styles.statLabel}>Completion Rate (Last 30 Days)</Text>
           </View>
         </View>
 
@@ -182,6 +148,10 @@ const styles = StyleSheet.create({
     width: '47%',
     borderWidth: 1,
     borderColor: '#2a2a2a',
+  },
+  fullWidthCard: {
+    width: '100%',
+    marginTop: 8,
   },
   statValue: {
     fontSize: 32,
