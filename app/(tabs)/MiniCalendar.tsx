@@ -1,7 +1,8 @@
 import { loadStreakData, StreakItem } from '@/utils/storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function MiniCalendarScreen() {
   const [streaks, setStreaks] = useState<StreakItem[]>([]);

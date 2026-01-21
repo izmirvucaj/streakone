@@ -10,6 +10,8 @@ export interface StreakItem {
   createdAt: string; // When the streak was created
   color?: string; // Optional color for the streak card
   targetDays?: number; // Optional target days (e.g., 30 days goal)
+  notificationEnabled?: boolean; // Whether notifications are enabled
+  notificationTime?: string; // Notification time in HH:mm format (e.g., "09:00")
 }
 
 export interface StreakData {

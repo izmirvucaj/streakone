@@ -1,10 +1,12 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { cancelStreakNotification, requestNotificationPermissions, scheduleStreakNotification } from '@/utils/notifications';
 import { deleteStreak, getStreakById, StreakItem, updateStreak } from '@/utils/storage';
 import { calculateProgress, calculateStreak, checkMilestoneReached, getCurrentMilestone, getMilestoneMessage, getMotivationMessage, getNextMilestone, MILESTONES, STREAK_COLORS } from '@/utils/streakHelpers';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 export default function StreakDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -13,8 +15,12 @@ export default function StreakDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showTargetModal, setShowTargetModal] = useState(false);
+  const [showEditNameModal, setShowEditNameModal] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [targetInput, setTargetInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [selectedTime, setSelectedTime] = useState(new Date());
   const scaleAnim = useState(new Animated.Value(1))[0];
 
   const loadStreak = useCallback(async () => {
@@ -149,6 +155,106 @@ export default function StreakDetailScreen() {
     }
   };
 
+  const handleNotificationToggle = async (enabled: boolean) => {
+    if (!streak || !id) return;
+
+    if (enabled) {
+      // Request permissions first
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
+        Alert.alert(
+          'Permission Required',
+          'Please enable notifications in your device settings to receive daily reminders.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // If no time set, use default 9:00 AM
+      const time = streak.notificationTime || '09:00';
+      const success = await updateStreak(id, { 
+        notificationEnabled: true,
+        notificationTime: time,
+      });
+      
+      if (success) {
+        const updatedStreak = { ...streak, notificationEnabled: true, notificationTime: time };
+        setStreak(updatedStreak);
+        await scheduleStreakNotification(updatedStreak);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } else {
+      const success = await updateStreak(id, { notificationEnabled: false });
+      if (success) {
+        setStreak({ ...streak, notificationEnabled: false });
+        await cancelStreakNotification(id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }
+  };
+
+  const handleTimePickerOpen = () => {
+    if (streak?.notificationTime) {
+      const [hours, minutes] = streak.notificationTime.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours);
+      date.setMinutes(minutes);
+      setSelectedTime(date);
+    }
+    setShowTimePicker(true);
+  };
+
+  const handleTimePickerChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (date) {
+      setSelectedTime(date);
+      if (Platform.OS === 'android') {
+        handleNotificationTimeSave(date);
+      }
+    }
+  };
+
+  const handleNotificationTimeSave = async (date?: Date) => {
+    if (!streak || !id) return;
+    
+    const timeToSave = date || selectedTime;
+    const hours = timeToSave.getHours().toString().padStart(2, '0');
+    const minutes = timeToSave.getMinutes().toString().padStart(2, '0');
+    const timeString = `${hours}:${minutes}`;
+
+    const success = await updateStreak(id, { notificationTime: timeString });
+    if (success) {
+      const updatedStreak = { ...streak, notificationTime: timeString };
+      setStreak(updatedStreak);
+      
+      // Reschedule notification if enabled
+      if (updatedStreak.notificationEnabled) {
+        await scheduleStreakNotification(updatedStreak);
+      }
+      
+      setShowTimePicker(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const handleNameSave = async () => {
+    if (!streak || !id) return;
+    const newName = nameInput.trim();
+    if (!newName) {
+      Alert.alert('Invalid Input', 'Please enter a valid name');
+      return;
+    }
+    const success = await updateStreak(id, { name: newName });
+    if (success) {
+      setStreak({ ...streak, name: newName });
+      setShowEditNameModal(false);
+      setNameInput('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
   const renderMiniCalendar = () => {
     if (!streak) return null;
 
@@ -226,7 +332,18 @@ export default function StreakDetailScreen() {
 
         {/* Streak Info */}
         <View style={[styles.streakHeader, { borderLeftColor: streak.color || STREAK_COLORS[0] }]}>
-          <Text style={styles.streakName}>{streak.name}</Text>
+          <View style={styles.streakNameRow}>
+            <Text style={styles.streakName}>{streak.name}</Text>
+            <Pressable 
+              style={styles.editNameButton}
+              onPress={() => {
+                setNameInput(streak.name);
+                setShowEditNameModal(true);
+              }}
+            >
+              <IconSymbol name="pencil" size={16} color="#9ca3af" />
+            </Pressable>
+          </View>
           <Text style={styles.streakCount}>🔥 {streak.streak} day streak</Text>
           <Text style={styles.totalDays}>{streak.doneDates.length} total days</Text>
           
@@ -339,6 +456,34 @@ export default function StreakDetailScreen() {
                 {streak.targetDays ? 'Edit Target' : 'Set Target'}
               </Text>
             </Pressable>
+          </View>
+
+          {/* Notification Settings */}
+          <View style={styles.notificationSection}>
+            <View style={styles.notificationHeader}>
+              <View style={styles.notificationHeaderLeft}>
+                <IconSymbol name="bell.fill" size={18} color="#9ca3af" />
+                <Text style={styles.notificationTitle}>Daily Reminder</Text>
+              </View>
+              <Switch
+                value={streak.notificationEnabled || false}
+                onValueChange={handleNotificationToggle}
+                trackColor={{ false: '#2a2a2a', true: streak.color || STREAK_COLORS[0] }}
+                thumbColor={streak.notificationEnabled ? '#fff' : '#9ca3af'}
+              />
+            </View>
+            {streak.notificationEnabled && (
+              <Pressable
+                style={styles.notificationTimeButton}
+                onPress={handleTimePickerOpen}
+              >
+                <IconSymbol name="clock" size={16} color="#9ca3af" />
+                <Text style={styles.notificationTimeText}>
+                  {streak.notificationTime || '09:00'}
+                </Text>
+                <IconSymbol name="chevron.right" size={14} color="#666" />
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -469,6 +614,132 @@ export default function StreakDetailScreen() {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Time Picker */}
+      {showTimePicker && (
+        <>
+          {Platform.OS === 'ios' && (
+            <Modal
+              visible={showTimePicker}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setShowTimePicker(false)}
+            >
+              <Pressable 
+                style={styles.modalOverlay}
+                onPress={() => setShowTimePicker(false)}
+              >
+                <Pressable 
+                  style={styles.timePickerModal}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <View style={styles.timePickerHeader}>
+                    <Text style={styles.modalTitle}>Set Reminder Time</Text>
+                    <Pressable
+                      onPress={() => setShowTimePicker(false)}
+                      style={styles.closeButton}
+                    >
+                      <IconSymbol name="xmark" size={20} color="#fff" />
+                    </Pressable>
+                  </View>
+                  <DateTimePicker
+                    value={selectedTime}
+                    mode="time"
+                    is24Hour={false}
+                    display="spinner"
+                    onChange={handleTimePickerChange}
+                    style={styles.timePicker}
+                    textColor="#fff"
+                  />
+                  <View style={styles.targetModalButtons}>
+                    <Pressable
+                      style={[styles.targetModalButton, styles.cancelButton]}
+                      onPress={() => setShowTimePicker(false)}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.targetModalButton, styles.saveButton]}
+                      onPress={() => handleNotificationTimeSave()}
+                    >
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    </Pressable>
+                  </View>
+                </Pressable>
+              </Pressable>
+            </Modal>
+          )}
+          {Platform.OS === 'android' && (
+            <DateTimePicker
+              value={selectedTime}
+              mode="time"
+              is24Hour={false}
+              display="default"
+              onChange={handleTimePickerChange}
+            />
+          )}
+        </>
+      )}
+
+      {/* Edit Name Modal */}
+      <Modal
+        visible={showEditNameModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowEditNameModal(false);
+          setNameInput('');
+        }}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <Pressable 
+            style={styles.modalOverlay}
+            onPress={() => {
+              setShowEditNameModal(false);
+              setNameInput('');
+            }}
+          >
+            <Pressable 
+              style={styles.targetModal}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.modalTitle}>Edit Streak Name</Text>
+              <TextInput
+                style={styles.targetInput}
+                placeholder="Enter streak name"
+                placeholderTextColor="#666"
+                value={nameInput}
+                onChangeText={setNameInput}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleNameSave}
+                maxLength={50}
+              />
+              <View style={styles.targetModalButtons}>
+                <Pressable
+                  style={[styles.targetModalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowEditNameModal(false);
+                    setNameInput('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.targetModalButton, styles.saveButton]}
+                  onPress={handleNameSave}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -510,7 +781,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2a2a2a',
   },
-  streakName: { fontSize: 24, fontWeight: '700', color: '#fff', marginBottom: 6 },
+  streakNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  streakName: { fontSize: 24, fontWeight: '700', color: '#fff', flex: 1 },
+  editNameButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#0f0f0f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   streakCount: { fontSize: 20, fontWeight: '700', color: '#22c55e', marginBottom: 4 },
   totalDays: { fontSize: 13, color: '#9ca3af', marginBottom: 12 },
   milestonesSection: {
@@ -617,6 +902,40 @@ const styles = StyleSheet.create({
     borderColor: '#2a2a2a',
   },
   settingButtonText: { fontSize: 13, color: '#9ca3af', fontWeight: '500' },
+  notificationSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  notificationHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notificationTitle: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  notificationTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  notificationTimeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
   calendarSection: { marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 12 },
   calendarContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
@@ -652,7 +971,40 @@ const styles = StyleSheet.create({
     bottom: 0,
     maxHeight: '50%',
   },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 20, textAlign: 'center' },
+  timePickerModal: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    position: 'absolute',
+    bottom: 0,
+    maxHeight: '60%',
+  },
+  timePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#0f0f0f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePicker: {
+    width: '100%',
+    height: 200,
+    marginVertical: 20,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 8, textAlign: 'center' },
+  modalSubtitle: { fontSize: 14, color: '#9ca3af', marginBottom: 20, textAlign: 'center' },
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
