@@ -1,10 +1,12 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTheme } from '@/hooks/use-theme';
 import { loadStreakData } from '@/utils/storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function ExploreScreen() {
+  const { colors } = useTheme();
   const [stats, setStats] = useState({
     totalStreaks: 0,
     totalDays: 0,
@@ -67,49 +69,74 @@ export default function ExploreScreen() {
     }, [loadStats])
   );
 
+  const dynamicStyles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    title: { fontSize: 32, fontWeight: '700', color: colors.text, marginBottom: 24, textAlign: 'center' },
+    statCard: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 16,
+      padding: 20,
+      alignItems: 'center',
+      width: '47%',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    statValue: { fontSize: 32, fontWeight: '700', color: colors.text, marginTop: 12, marginBottom: 4 },
+    statLabel: { fontSize: 12, color: colors.secondaryText, textAlign: 'center' },
+    infoSection: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    infoTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 12 },
+    infoText: { fontSize: 14, color: colors.secondaryText, lineHeight: 20, marginBottom: 12 },
+  });
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={dynamicStyles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Statistics</Text>
+        <Text style={dynamicStyles.title}>Statistics</Text>
         
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <IconSymbol name="list.bullet" size={32} color="#3b82f6" />
-            <Text style={styles.statValue}>{stats.totalStreaks}</Text>
-            <Text style={styles.statLabel}>Total Streaks</Text>
+          <View style={dynamicStyles.statCard}>
+            <IconSymbol name="list.bullet" size={32} color={colors.info} />
+            <Text style={dynamicStyles.statValue}>{stats.totalStreaks}</Text>
+            <Text style={dynamicStyles.statLabel}>Total Streaks</Text>
           </View>
 
-          <View style={styles.statCard}>
-            <IconSymbol name="trophy.fill" size={32} color="#ffd700" />
-            <Text style={styles.statValue}>{stats.bestStreak}</Text>
-            <Text style={styles.statLabel}>Best Streak</Text>
+          <View style={dynamicStyles.statCard}>
+            <IconSymbol name="trophy.fill" size={32} color={colors.warning} />
+            <Text style={dynamicStyles.statValue}>{stats.bestStreak}</Text>
+            <Text style={dynamicStyles.statLabel}>Best Streak</Text>
           </View>
 
-          <View style={styles.statCard}>
-            <IconSymbol name="checkmark.circle.fill" size={32} color="#22c55e" />
-            <Text style={styles.statValue}>{stats.totalDays}</Text>
-            <Text style={styles.statLabel}>Total Days</Text>
+          <View style={dynamicStyles.statCard}>
+            <IconSymbol name="checkmark.circle.fill" size={32} color={colors.success} />
+            <Text style={dynamicStyles.statValue}>{stats.totalDays}</Text>
+            <Text style={dynamicStyles.statLabel}>Total Days</Text>
           </View>
 
-          <View style={styles.statCard}>
+          <View style={dynamicStyles.statCard}>
             <IconSymbol name="chart.bar.fill" size={32} color="#8b5cf6" />
-            <Text style={styles.statValue}>{stats.averageStreak}</Text>
-            <Text style={styles.statLabel}>Avg Streak</Text>
+            <Text style={dynamicStyles.statValue}>{stats.averageStreak}</Text>
+            <Text style={dynamicStyles.statLabel}>Avg Streak</Text>
           </View>
 
-          <View style={[styles.statCard, styles.fullWidthCard]}>
+          <View style={[dynamicStyles.statCard, styles.fullWidthCard]}>
             <IconSymbol name="calendar" size={32} color="#ec4899" />
-            <Text style={styles.statValue}>{stats.completionRate}%</Text>
-            <Text style={styles.statLabel}>Completion Rate (Last 30 Days)</Text>
+            <Text style={dynamicStyles.statValue}>{stats.completionRate}%</Text>
+            <Text style={dynamicStyles.statLabel}>Completion Rate (Last 30 Days)</Text>
           </View>
         </View>
 
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>About StreakOne</Text>
-          <Text style={styles.infoText}>
+        <View style={dynamicStyles.infoSection}>
+          <Text style={dynamicStyles.infoTitle}>About StreakOne</Text>
+          <Text style={dynamicStyles.infoText}>
             Track your daily habits and build consistency. Mark each day as done to maintain your streak.
           </Text>
-          <Text style={styles.infoText}>
+          <Text style={dynamicStyles.infoText}>
             Keep your streak alive by completing your task every day. Missing a day will reset your current streak.
           </Text>
         </View>
@@ -119,19 +146,8 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f0f0f',
-  },
   scrollContainer: {
     padding: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 24,
-    textAlign: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -140,48 +156,8 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     gap: 16,
   },
-  statCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    width: '47%',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
   fullWidthCard: {
     width: '100%',
     marginTop: 8,
-  },
-  statValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#9ca3af',
-    textAlign: 'center',
-  },
-  infoSection: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  infoTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    lineHeight: 20,
-    marginBottom: 12,
   },
 });

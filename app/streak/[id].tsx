@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTheme } from '@/hooks/use-theme';
 import { cancelStreakNotification, requestNotificationPermissions, scheduleStreakNotification } from '@/utils/notifications';
 import { deleteStreak, getStreakById, StreakItem, updateStreak } from '@/utils/storage';
 import { calculateProgress, calculateStreak, checkMilestoneReached, getCurrentMilestone, getMilestoneMessage, getMotivationMessage, getNextMilestone, MILESTONES, STREAK_COLORS } from '@/utils/streakHelpers';
@@ -9,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 export default function StreakDetailScreen() {
+  const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [streak, setStreak] = useState<StreakItem | null>(null);
@@ -283,13 +285,13 @@ export default function StreakDetailScreen() {
                   backgroundColor: done
                     ? streak.color || STREAK_COLORS[0]
                     : isPast
-                    ? '#dc2626'
-                    : '#444',
+                    ? colors.danger
+                    : colors.cardBorder,
                 },
-                isToday && { borderWidth: 2, borderColor: '#fff' },
+                isToday && { borderWidth: 2, borderColor: colors.text },
               ]}
             >
-              <Text style={styles.dayText}>{date.getDate()}</Text>
+              <Text style={[styles.dayText, { color: colors.text }]}>{date.getDate()}</Text>
             </View>
           );
         })}
@@ -297,11 +299,184 @@ export default function StreakDetailScreen() {
     );
   };
 
+  const dynamicStyles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    loadingText: { color: colors.text, fontSize: 16 },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.cardBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.cardBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    streakHeader: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 16,
+      borderLeftWidth: 4,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    streakName: { fontSize: 24, fontWeight: '700', color: colors.text, flex: 1 },
+    editNameButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: colors.inputBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    streakCount: { fontSize: 20, fontWeight: '700', color: colors.success, marginBottom: 4 },
+    totalDays: { fontSize: 13, color: colors.secondaryText, marginBottom: 12 },
+    milestonesTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
+    currentMilestoneBadge: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      borderWidth: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.cardBackground,
+    },
+    milestoneBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: colors.inputBackground,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    milestoneText: { fontSize: 11, fontWeight: '600', color: colors.secondaryText },
+    milestoneDays: { fontSize: 10, color: colors.secondaryText, marginLeft: 2 },
+    nextMilestoneText: { fontSize: 12, color: colors.secondaryText, fontStyle: 'italic' },
+    targetLabel: { fontSize: 13, fontWeight: '600', color: colors.text },
+    progressBarContainer: {
+      height: 8,
+      backgroundColor: colors.cardBorder,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginBottom: 8,
+    },
+    progressText: { fontSize: 11, color: colors.secondaryText, marginBottom: 6 },
+    motivationText: { fontSize: 13, color: colors.text, fontWeight: '500' },
+    settingButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      padding: 10,
+      backgroundColor: colors.inputBackground,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    settingButtonText: { fontSize: 13, color: colors.secondaryText, fontWeight: '500' },
+    notificationTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
+    notificationTimeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.inputBackground,
+      borderRadius: 8,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    notificationTimeText: {
+      flex: 1,
+      fontSize: 13,
+      color: colors.secondaryText,
+      fontWeight: '500',
+    },
+    sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 12 },
+    buttonText: { color: colors.isDark ? colors.text : '#0f0f0f', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.modalOverlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    colorPickerModal: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 20,
+      padding: 24,
+      width: '85%',
+      maxWidth: 400,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    targetModal: {
+      backgroundColor: colors.cardBackground,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 24,
+      paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+      width: '100%',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      position: 'absolute',
+      bottom: 0,
+      maxHeight: '50%',
+    },
+    timePickerModal: {
+      backgroundColor: colors.cardBackground,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 24,
+      paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+      width: '100%',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      position: 'absolute',
+      bottom: 0,
+      maxHeight: '60%',
+    },
+    closeButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.inputBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 8, textAlign: 'center' },
+    targetInput: {
+      backgroundColor: colors.inputBackground,
+      borderRadius: 12,
+      padding: 16,
+      color: colors.text,
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      marginBottom: 20,
+    },
+    cancelButton: { backgroundColor: colors.cardBorder },
+    cancelButtonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+    saveButton: { backgroundColor: colors.success },
+    saveButtonText: { color: colors.isDark ? colors.text : '#0f0f0f', fontSize: 16, fontWeight: '700' },
+    removeButton: { backgroundColor: colors.danger },
+    removeButtonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  });
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={dynamicStyles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={dynamicStyles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
@@ -309,46 +484,46 @@ export default function StreakDetailScreen() {
 
   if (!streak) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={dynamicStyles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Streak not found</Text>
+          <Text style={dynamicStyles.loadingText}>Streak not found</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={dynamicStyles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <IconSymbol name="chevron.left" size={24} color="#fff" />
+          <Pressable style={dynamicStyles.backButton} onPress={() => router.back()}>
+            <IconSymbol name="chevron.left" size={24} color={colors.text} />
           </Pressable>
-          <Pressable style={styles.deleteButton} onPress={handleDelete}>
-            <IconSymbol name="trash" size={20} color="#ef4444" />
+          <Pressable style={dynamicStyles.deleteButton} onPress={handleDelete}>
+            <IconSymbol name="trash" size={20} color={colors.danger} />
           </Pressable>
         </View>
 
         {/* Streak Info */}
-        <View style={[styles.streakHeader, { borderLeftColor: streak.color || STREAK_COLORS[0] }]}>
+        <View style={[dynamicStyles.streakHeader, { borderLeftColor: streak.color || STREAK_COLORS[0] }]}>
           <View style={styles.streakNameRow}>
-            <Text style={styles.streakName}>{streak.name}</Text>
+            <Text style={dynamicStyles.streakName}>{streak.name}</Text>
             <Pressable 
-              style={styles.editNameButton}
+              style={dynamicStyles.editNameButton}
               onPress={() => {
                 setNameInput(streak.name);
                 setShowEditNameModal(true);
               }}
             >
-              <IconSymbol name="pencil" size={16} color="#9ca3af" />
+              <IconSymbol name="pencil" size={16} color={colors.secondaryText} />
             </Pressable>
           </View>
-          <Text style={styles.streakCount}>🔥 {streak.streak} day streak</Text>
-          <Text style={styles.totalDays}>{streak.doneDates.length} total days</Text>
+          <Text style={dynamicStyles.streakCount}>🔥 {streak.streak} day streak</Text>
+          <Text style={dynamicStyles.totalDays}>{streak.doneDates.length} total days</Text>
           
           {/* Milestones - Collapsible */}
-          <View style={styles.milestonesSection}>
+          <View style={[styles.milestonesSection, { borderTopColor: colors.cardBorder }]}>
             <Pressable 
               style={styles.milestonesHeader}
               onPress={() => setShowAchievements(!showAchievements)}
@@ -357,13 +532,13 @@ export default function StreakDetailScreen() {
                 <IconSymbol 
                   name="chevron.right" 
                   size={18} 
-                  color="#9ca3af"
+                  color={colors.secondaryText}
                   style={{ transform: [{ rotate: showAchievements ? '90deg' : '0deg' }] }}
                 />
-                <Text style={styles.milestonesTitle}>Achievements</Text>
+                <Text style={dynamicStyles.milestonesTitle}>Achievements</Text>
               </View>
               {getCurrentMilestone(streak.streak) && (
-                <View style={[styles.currentMilestoneBadge, { borderColor: getCurrentMilestone(streak.streak)!.color }]}>
+                <View style={[dynamicStyles.currentMilestoneBadge, { borderColor: getCurrentMilestone(streak.streak)!.color }]}>
                   <Text style={styles.currentMilestoneEmoji}>{getCurrentMilestone(streak.streak)?.emoji}</Text>
                 </View>
               )}
@@ -377,22 +552,22 @@ export default function StreakDetailScreen() {
                       <View
                         key={milestone.days}
                         style={[
-                          styles.milestoneBadge,
+                          dynamicStyles.milestoneBadge,
                           achieved && styles.milestoneBadgeAchieved,
-                          { borderColor: achieved ? milestone.color : '#2a2a2a' },
+                          { borderColor: achieved ? milestone.color : colors.cardBorder },
                         ]}
                       >
                         <Text style={styles.milestoneEmoji}>{milestone.emoji}</Text>
-                        <Text style={[styles.milestoneText, achieved && { color: milestone.color }]}>
+                        <Text style={[dynamicStyles.milestoneText, achieved && { color: milestone.color }]}>
                           {milestone.name}
                         </Text>
-                        <Text style={styles.milestoneDays}>{milestone.days}</Text>
+                        <Text style={dynamicStyles.milestoneDays}>{milestone.days}</Text>
                       </View>
                     );
                   })}
                 </View>
                 {getNextMilestone(streak.streak) && (
-                  <Text style={styles.nextMilestoneText}>
+                  <Text style={dynamicStyles.nextMilestoneText}>
                     Next: {getNextMilestone(streak.streak)?.emoji} {getNextMilestone(streak.streak)?.name} in {getNextMilestone(streak.streak)!.days - streak.streak} days
                   </Text>
                 )}
@@ -402,14 +577,14 @@ export default function StreakDetailScreen() {
           
           {/* Target Progress */}
           {streak.targetDays && (
-            <View style={styles.targetSection}>
+            <View style={[styles.targetSection, { borderTopColor: colors.cardBorder }]}>
               <View style={styles.targetHeader}>
-                <Text style={styles.targetLabel}>Target: {streak.targetDays} days</Text>
+                <Text style={dynamicStyles.targetLabel}>Target: {streak.targetDays} days</Text>
                 <Pressable onPress={() => setShowTargetModal(true)}>
-                  <IconSymbol name="pencil" size={16} color="#9ca3af" />
+                  <IconSymbol name="pencil" size={16} color={colors.secondaryText} />
                 </Pressable>
               </View>
-              <View style={styles.progressBarContainer}>
+              <View style={dynamicStyles.progressBarContainer}>
                 <View 
                   style={[
                     styles.progressBar, 
@@ -420,11 +595,11 @@ export default function StreakDetailScreen() {
                   ]} 
                 />
               </View>
-              <Text style={styles.progressText}>
+              <Text style={dynamicStyles.progressText}>
                 {calculateProgress(streak.streak, streak.targetDays)}% completed
                 {streak.streak < streak.targetDays && ` • ${streak.targetDays - streak.streak} days left`}
               </Text>
-              <Text style={styles.motivationText}>
+              <Text style={dynamicStyles.motivationText}>
                 {getMotivationMessage(
                   calculateProgress(streak.streak, streak.targetDays),
                   streak.targetDays - streak.streak
@@ -434,16 +609,16 @@ export default function StreakDetailScreen() {
           )}
           
           {/* Settings */}
-          <View style={styles.settingsRow}>
+          <View style={[styles.settingsRow, { borderTopColor: colors.cardBorder }]}>
             <Pressable 
-              style={styles.settingButton}
+              style={dynamicStyles.settingButton}
               onPress={() => setShowColorPicker(true)}
             >
-              <IconSymbol name="paintbrush.fill" size={18} color="#9ca3af" />
-              <Text style={styles.settingButtonText}>Color</Text>
+              <IconSymbol name="paintbrush.fill" size={18} color={colors.secondaryText} />
+              <Text style={dynamicStyles.settingButtonText}>Color</Text>
             </Pressable>
             <Pressable 
-              style={styles.settingButton}
+              style={dynamicStyles.settingButton}
               onPress={() => {
                 if (streak.targetDays) {
                   setTargetInput(streak.targetDays.toString());
@@ -451,37 +626,37 @@ export default function StreakDetailScreen() {
                 setShowTargetModal(true);
               }}
             >
-              <IconSymbol name="target" size={18} color="#9ca3af" />
-              <Text style={styles.settingButtonText}>
+              <IconSymbol name="target" size={18} color={colors.secondaryText} />
+              <Text style={dynamicStyles.settingButtonText}>
                 {streak.targetDays ? 'Edit Target' : 'Set Target'}
               </Text>
             </Pressable>
           </View>
 
           {/* Notification Settings */}
-          <View style={styles.notificationSection}>
+          <View style={[styles.notificationSection, { borderTopColor: colors.cardBorder }]}>
             <View style={styles.notificationHeader}>
               <View style={styles.notificationHeaderLeft}>
-                <IconSymbol name="bell.fill" size={18} color="#9ca3af" />
-                <Text style={styles.notificationTitle}>Daily Reminder</Text>
+                <IconSymbol name="bell.fill" size={18} color={colors.secondaryText} />
+                <Text style={dynamicStyles.notificationTitle}>Daily Reminder</Text>
               </View>
               <Switch
                 value={streak.notificationEnabled || false}
                 onValueChange={handleNotificationToggle}
-                trackColor={{ false: '#2a2a2a', true: streak.color || STREAK_COLORS[0] }}
-                thumbColor={streak.notificationEnabled ? '#fff' : '#9ca3af'}
+                trackColor={{ false: colors.cardBorder, true: streak.color || STREAK_COLORS[0] }}
+                thumbColor={streak.notificationEnabled ? colors.text : colors.secondaryText}
               />
             </View>
             {streak.notificationEnabled && (
               <Pressable
-                style={styles.notificationTimeButton}
+                style={dynamicStyles.notificationTimeButton}
                 onPress={handleTimePickerOpen}
               >
-                <IconSymbol name="clock" size={16} color="#9ca3af" />
-                <Text style={styles.notificationTimeText}>
+                <IconSymbol name="clock" size={16} color={colors.secondaryText} />
+                <Text style={dynamicStyles.notificationTimeText}>
                   {streak.notificationTime || '09:00'}
                 </Text>
-                <IconSymbol name="chevron.right" size={14} color="#666" />
+                <IconSymbol name="chevron.right" size={14} color={colors.secondaryText} />
               </Pressable>
             )}
           </View>
@@ -489,7 +664,7 @@ export default function StreakDetailScreen() {
 
         {/* Calendar */}
         <View style={styles.calendarSection}>
-          <Text style={styles.sectionTitle}>Last 7 Days</Text>
+          <Text style={dynamicStyles.sectionTitle}>Last 7 Days</Text>
           {renderMiniCalendar()}
         </View>
 
@@ -499,7 +674,7 @@ export default function StreakDetailScreen() {
             style={[styles.button, { backgroundColor: streak.color || STREAK_COLORS[0] }]}
             onPress={handleDone}
           >
-            <Text style={styles.buttonText}>DONE TODAY</Text>
+            <Text style={dynamicStyles.buttonText}>DONE TODAY</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
@@ -512,14 +687,14 @@ export default function StreakDetailScreen() {
         onRequestClose={() => setShowColorPicker(false)}
       >
         <Pressable 
-          style={styles.modalOverlay}
+          style={dynamicStyles.modalOverlay}
           onPress={() => setShowColorPicker(false)}
         >
           <Pressable 
-            style={styles.colorPickerModal}
+            style={dynamicStyles.colorPickerModal}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={styles.modalTitle}>Choose Color</Text>
+            <Text style={dynamicStyles.modalTitle}>Choose Color</Text>
             <View style={styles.colorGrid}>
               {STREAK_COLORS.map((color) => (
                 <Pressable
@@ -532,7 +707,7 @@ export default function StreakDetailScreen() {
                   onPress={() => handleColorChange(color)}
                 >
                   {streak.color === color && (
-                    <IconSymbol name="checkmark" size={20} color="#fff" />
+                    <IconSymbol name="checkmark" size={20} color={colors.text} />
                   )}
                 </Pressable>
               ))}
@@ -552,28 +727,28 @@ export default function StreakDetailScreen() {
         }}
       >
         <KeyboardAvoidingView
-          style={styles.modalOverlay}
+          style={dynamicStyles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <Pressable 
-            style={styles.modalOverlay}
+            style={dynamicStyles.modalOverlay}
             onPress={() => {
               setShowTargetModal(false);
               setTargetInput('');
             }}
           >
             <Pressable 
-              style={styles.targetModal}
+              style={dynamicStyles.targetModal}
               onPress={(e) => e.stopPropagation()}
             >
-            <Text style={styles.modalTitle}>
+            <Text style={dynamicStyles.modalTitle}>
               {streak.targetDays ? 'Edit Target' : 'Set Target'}
             </Text>
             <TextInput
-              style={styles.targetInput}
+              style={dynamicStyles.targetInput}
               placeholder="Target days (e.g., 30)"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.secondaryText}
               value={targetInput}
               onChangeText={setTargetInput}
               keyboardType="number-pad"
@@ -584,30 +759,30 @@ export default function StreakDetailScreen() {
             <View style={styles.targetModalButtons}>
               {streak.targetDays && (
                 <Pressable
-                  style={[styles.targetModalButton, styles.removeButton]}
+                  style={[styles.targetModalButton, dynamicStyles.removeButton]}
                   onPress={() => {
                     handleTargetRemove();
                     setShowTargetModal(false);
                     setTargetInput('');
                   }}
                 >
-                  <Text style={styles.removeButtonText}>Remove</Text>
+                  <Text style={dynamicStyles.removeButtonText}>Remove</Text>
                 </Pressable>
               )}
               <Pressable
-                style={[styles.targetModalButton, styles.cancelButton]}
+                style={[styles.targetModalButton, dynamicStyles.cancelButton]}
                 onPress={() => {
                   setShowTargetModal(false);
                   setTargetInput('');
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={dynamicStyles.cancelButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.targetModalButton, styles.saveButton]}
+                style={[styles.targetModalButton, dynamicStyles.saveButton]}
                 onPress={handleTargetSave}
               >
-                <Text style={styles.saveButtonText}>Save</Text>
+                <Text style={dynamicStyles.saveButtonText}>Save</Text>
               </Pressable>
             </View>
             </Pressable>
@@ -626,20 +801,20 @@ export default function StreakDetailScreen() {
               onRequestClose={() => setShowTimePicker(false)}
             >
               <Pressable 
-                style={styles.modalOverlay}
+                style={dynamicStyles.modalOverlay}
                 onPress={() => setShowTimePicker(false)}
               >
                 <Pressable 
-                  style={styles.timePickerModal}
+                  style={dynamicStyles.timePickerModal}
                   onPress={(e) => e.stopPropagation()}
                 >
                   <View style={styles.timePickerHeader}>
-                    <Text style={styles.modalTitle}>Set Reminder Time</Text>
+                    <Text style={dynamicStyles.modalTitle}>Set Reminder Time</Text>
                     <Pressable
                       onPress={() => setShowTimePicker(false)}
-                      style={styles.closeButton}
+                      style={dynamicStyles.closeButton}
                     >
-                      <IconSymbol name="xmark" size={20} color="#fff" />
+                      <IconSymbol name="xmark" size={20} color={colors.text} />
                     </Pressable>
                   </View>
                   <DateTimePicker
@@ -649,20 +824,20 @@ export default function StreakDetailScreen() {
                     display="spinner"
                     onChange={handleTimePickerChange}
                     style={styles.timePicker}
-                    textColor="#fff"
+                    textColor={colors.text}
                   />
                   <View style={styles.targetModalButtons}>
                     <Pressable
-                      style={[styles.targetModalButton, styles.cancelButton]}
+                      style={[styles.targetModalButton, dynamicStyles.cancelButton]}
                       onPress={() => setShowTimePicker(false)}
                     >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                      <Text style={dynamicStyles.cancelButtonText}>Cancel</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.targetModalButton, styles.saveButton]}
+                      style={[styles.targetModalButton, dynamicStyles.saveButton]}
                       onPress={() => handleNotificationTimeSave()}
                     >
-                      <Text style={styles.saveButtonText}>Save</Text>
+                      <Text style={dynamicStyles.saveButtonText}>Save</Text>
                     </Pressable>
                   </View>
                 </Pressable>
@@ -692,26 +867,26 @@ export default function StreakDetailScreen() {
         }}
       >
         <KeyboardAvoidingView
-          style={styles.modalOverlay}
+          style={dynamicStyles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <Pressable 
-            style={styles.modalOverlay}
+            style={dynamicStyles.modalOverlay}
             onPress={() => {
               setShowEditNameModal(false);
               setNameInput('');
             }}
           >
             <Pressable 
-              style={styles.targetModal}
+              style={dynamicStyles.targetModal}
               onPress={(e) => e.stopPropagation()}
             >
-              <Text style={styles.modalTitle}>Edit Streak Name</Text>
+              <Text style={dynamicStyles.modalTitle}>Edit Streak Name</Text>
               <TextInput
-                style={styles.targetInput}
+                style={dynamicStyles.targetInput}
                 placeholder="Enter streak name"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.secondaryText}
                 value={nameInput}
                 onChangeText={setNameInput}
                 autoFocus
@@ -721,19 +896,19 @@ export default function StreakDetailScreen() {
               />
               <View style={styles.targetModalButtons}>
                 <Pressable
-                  style={[styles.targetModalButton, styles.cancelButton]}
+                  style={[styles.targetModalButton, dynamicStyles.cancelButton]}
                   onPress={() => {
                     setShowEditNameModal(false);
                     setNameInput('');
                   }}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={dynamicStyles.cancelButtonText}>Cancel</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.targetModalButton, styles.saveButton]}
+                  style={[styles.targetModalButton, dynamicStyles.saveButton]}
                   onPress={handleNameSave}
                 >
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <Text style={dynamicStyles.saveButtonText}>Save</Text>
                 </Pressable>
               </View>
             </Pressable>
@@ -745,41 +920,14 @@ export default function StreakDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
   scrollView: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#fff', fontSize: 16 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 22,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1a1a1a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1a1a1a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakHeader: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
   },
   streakNameRow: {
     flexDirection: 'row',
@@ -787,22 +935,11 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 6,
   },
-  streakName: { fontSize: 24, fontWeight: '700', color: '#fff', flex: 1 },
-  editNameButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#0f0f0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakCount: { fontSize: 20, fontWeight: '700', color: '#22c55e', marginBottom: 4 },
-  totalDays: { fontSize: 13, color: '#9ca3af', marginBottom: 12 },
+  currentMilestoneEmoji: { fontSize: 14 },
   milestonesSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
     marginBottom: 12,
   },
   milestonesHeader: {
@@ -817,17 +954,6 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1,
   },
-  milestonesTitle: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  currentMilestoneBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1a1a1a',
-  },
-  currentMilestoneEmoji: { fontSize: 14 },
   milestonesContent: {
     marginTop: 6,
   },
@@ -837,29 +963,14 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  milestoneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#0f0f0f',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
   milestoneBadgeAchieved: {
-    backgroundColor: '#1a1a1a',
+    opacity: 1,
   },
   milestoneEmoji: { fontSize: 16 },
-  milestoneText: { fontSize: 11, fontWeight: '600', color: '#9ca3af' },
-  milestoneDays: { fontSize: 10, color: '#666', marginLeft: 2 },
-  nextMilestoneText: { fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
   targetSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
   },
   targetHeader: {
     flexDirection: 'row',
@@ -867,46 +978,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  targetLabel: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
   progressBar: {
     height: '100%',
     borderRadius: 4,
   },
-  progressText: { fontSize: 11, color: '#9ca3af', marginBottom: 6 },
-  motivationText: { fontSize: 13, color: '#fff', fontWeight: '500' },
   settingsRow: {
     flexDirection: 'row',
     gap: 10,
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
   },
-  settingButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    padding: 10,
-    backgroundColor: '#0f0f0f',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  settingButtonText: { fontSize: 13, color: '#9ca3af', fontWeight: '500' },
   notificationSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
   },
   notificationHeader: {
     flexDirection: 'row',
@@ -919,92 +1005,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  notificationTitle: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  notificationTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0f0f0f',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  notificationTimeText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#9ca3af',
-    fontWeight: '500',
-  },
   calendarSection: { marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 12 },
   calendarContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   dayBox: { flex: 1, aspectRatio: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  dayText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  dayText: { fontWeight: '700', fontSize: 16 },
   button: { paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center' },
-  buttonText: { color: '#0f0f0f', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  colorPickerModal: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 24,
-    width: '85%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  targetModal: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    position: 'absolute',
-    bottom: 0,
-    maxHeight: '50%',
-  },
-  timePickerModal: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    position: 'absolute',
-    bottom: 0,
-    maxHeight: '60%',
-  },
   timePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#0f0f0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   timePicker: {
     width: '100%',
     height: 200,
     marginVertical: 20,
   },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 8, textAlign: 'center' },
-  modalSubtitle: { fontSize: 14, color: '#9ca3af', marginBottom: 20, textAlign: 'center' },
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1021,17 +1037,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   colorOptionSelected: {
-    borderColor: '#fff',
-  },
-  targetInput: {
-    backgroundColor: '#0f0f0f',
-    borderRadius: 12,
-    padding: 16,
-    color: '#fff',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    marginBottom: 20,
+    borderWidth: 3,
   },
   targetModalButtons: {
     flexDirection: 'row',
@@ -1043,10 +1049,4 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  cancelButton: { backgroundColor: '#2a2a2a' },
-  cancelButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  saveButton: { backgroundColor: '#22c55e' },
-  saveButtonText: { color: '#0f0f0f', fontSize: 16, fontWeight: '700' },
-  removeButton: { backgroundColor: '#ef4444' },
-  removeButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

@@ -10,20 +10,42 @@ const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
+    text: '#1f2937',
+    background: '#fafbfc',
     tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: '#6b7280',
+    tabIconDefault: '#9ca3af',
     tabIconSelected: tintColorLight,
+    // Extended colors for app screens
+    cardBackground: '#ffffff',
+    cardBorder: '#e5e7eb',
+    secondaryText: '#6b7280',
+    inputBackground: '#ffffff',
+    inputBorder: '#e5e7eb',
+    modalOverlay: 'rgba(0, 0, 0, 0.4)',
+    success: '#10b981',
+    danger: '#ef4444',
+    warning: '#f59e0b',
+    info: '#3b82f6',
   },
   dark: {
     text: '#ECEDEE',
-    background: '#151718',
+    background: '#0f0f0f',
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    // Extended colors for app screens
+    cardBackground: '#1a1a1a',
+    cardBorder: '#2a2a2a',
+    secondaryText: '#9ca3af',
+    inputBackground: '#0f0f0f',
+    inputBorder: '#2a2a2a',
+    modalOverlay: 'rgba(0, 0, 0, 0.7)',
+    success: '#22c55e',
+    danger: '#dc2626',
+    warning: '#f59e0b',
+    info: '#3b82f6',
   },
 };
 

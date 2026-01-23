@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@streak_data';
+const THEME_KEY = '@theme_preference';
 
 export interface StreakItem {
   id: string; // Unique ID for each streak
@@ -188,4 +189,38 @@ export function getStorageInfo(): {
     platform: 'unknown' as any, // Would need Platform.OS to determine
     location: 'Device local storage (persists across app restarts)',
   };
+}
+
+/**
+ * Theme preference storage
+ */
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+/**
+ * Get saved theme preference
+ */
+export async function getThemePreference(): Promise<ThemePreference | null> {
+  try {
+    const theme = await AsyncStorage.getItem(THEME_KEY);
+    if (theme === 'light' || theme === 'dark' || theme === 'system') {
+      return theme;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error loading theme preference:', error);
+    return null;
+  }
+}
+
+/**
+ * Save theme preference
+ */
+export async function saveThemePreference(theme: ThemePreference): Promise<boolean> {
+  try {
+    await AsyncStorage.setItem(THEME_KEY, theme);
+    return true;
+  } catch (error) {
+    console.error('Error saving theme preference:', error);
+    return false;
+  }
 }
