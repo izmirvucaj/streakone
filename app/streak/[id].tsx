@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 export default function StreakDetailScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [streak, setStreak] = useState<StreakItem | null>(null);
@@ -63,38 +63,53 @@ export default function StreakDetailScreen() {
     ]).start();
 
     const today = new Date().toDateString();
-    if (streak.doneDates.includes(today)) {
-      Alert.alert('Already done', 'You have already marked today as done!');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
-    }
+    const isDoneToday = streak.doneDates.includes(today);
 
-    const previousStreak = streak.streak;
-    const newDoneDates = [...streak.doneDates, today];
-    const newStreakCount = calculateStreak(newDoneDates);
+    if (isDoneToday) {
+      // UNDO: Remove today from doneDates
+      const newDoneDates = streak.doneDates.filter(d => d !== today);
+      const newStreakCount = calculateStreak(newDoneDates);
 
-    const updatedStreak: StreakItem = {
-      ...streak,
-      doneDates: newDoneDates,
-      streak: newStreakCount,
-    };
+      const updatedStreak: StreakItem = {
+        ...streak,
+        doneDates: newDoneDates,
+        streak: newStreakCount,
+      };
 
-    const success = await updateStreak(id, updatedStreak);
-    if (success) {
-      setStreak(updatedStreak);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Check for milestone achievement
-      const milestoneReached = checkMilestoneReached(newStreakCount, previousStreak);
-      if (milestoneReached) {
-        setTimeout(() => {
-          Alert.alert(
-            'Milestone Achieved! 🎉',
-            getMilestoneMessage(milestoneReached),
-            [{ text: 'Awesome!', style: 'default' }]
-          );
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }, 300);
+      const success = await updateStreak(id, updatedStreak);
+      if (success) {
+        setStreak(updatedStreak);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } else {
+      // DONE: Add today to doneDates
+      const previousStreak = streak.streak;
+      const newDoneDates = [...streak.doneDates, today];
+      const newStreakCount = calculateStreak(newDoneDates);
+
+      const updatedStreak: StreakItem = {
+        ...streak,
+        doneDates: newDoneDates,
+        streak: newStreakCount,
+      };
+
+      const success = await updateStreak(id, updatedStreak);
+      if (success) {
+        setStreak(updatedStreak);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        // Check for milestone achievement
+        const milestoneReached = checkMilestoneReached(newStreakCount, previousStreak);
+        if (milestoneReached) {
+          setTimeout(() => {
+            Alert.alert(
+              'Milestone Achieved! 🎉',
+              getMilestoneMessage(milestoneReached),
+              [{ text: 'Awesome!', style: 'default' }]
+            );
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }, 300);
+        }
       }
     }
   };
@@ -403,7 +418,7 @@ export default function StreakDetailScreen() {
       fontWeight: '500',
     },
     sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 12 },
-    buttonText: { color: colors.isDark ? colors.text : '#0f0f0f', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
+    buttonText: { color: isDark ? colors.text : '#0f0f0f', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
     modalOverlay: {
       flex: 1,
       backgroundColor: colors.modalOverlay,
@@ -467,7 +482,7 @@ export default function StreakDetailScreen() {
     cancelButton: { backgroundColor: colors.cardBorder },
     cancelButtonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
     saveButton: { backgroundColor: colors.success },
-    saveButtonText: { color: colors.isDark ? colors.text : '#0f0f0f', fontSize: 16, fontWeight: '700' },
+    saveButtonText: { color: isDark ? colors.text : '#0f0f0f', fontSize: 16, fontWeight: '700' },
     removeButton: { backgroundColor: colors.danger },
     removeButtonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   });
@@ -671,10 +686,19 @@ export default function StreakDetailScreen() {
         {/* Done Button */}
         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
           <Pressable
-            style={[styles.button, { backgroundColor: streak.color || STREAK_COLORS[0] }]}
+            style={[
+              styles.button,
+              {
+                backgroundColor: streak.doneDates.includes(new Date().toDateString())
+                  ? colors.danger
+                  : streak.color || STREAK_COLORS[0],
+              },
+            ]}
             onPress={handleDone}
           >
-            <Text style={dynamicStyles.buttonText}>DONE TODAY</Text>
+            <Text style={dynamicStyles.buttonText}>
+              {streak.doneDates.includes(new Date().toDateString()) ? 'UNDONE' : 'DONE TODAY'}
+            </Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
