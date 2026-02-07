@@ -1,14 +1,17 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useTheme } from '@/hooks/use-theme';
 import { loadStreakData, StreakItem } from '@/utils/storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 export default function MiniCalendarScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [streaks, setStreaks] = useState<StreakItem[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const loadData = useCallback(async () => {
     const loadedStreaks = await loadStreakData();
@@ -35,6 +38,19 @@ export default function MiniCalendarScreen() {
     return Array.from(allDates);
   };
 
+  const getStreaksForDate = (date: Date): StreakItem[] => {
+    const dateString = date.toDateString();
+    return streaks.filter(s => s.doneDates.includes(dateString));
+  };
+
+  const handleDatePress = (date: Date) => {
+    const streaksOnDate = getStreaksForDate(date);
+    if (streaksOnDate.length > 0) {
+      setSelectedDate(date);
+      setShowModal(true);
+    }
+  };
+
   const dynamicStyles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     title: { fontSize: 32, fontWeight: '700', color: colors.text, marginBottom: 8, textAlign: 'center' },
@@ -58,6 +74,64 @@ export default function MiniCalendarScreen() {
       color: colors.secondaryText,
       fontSize: 14,
       textAlign: 'center',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.modalOverlay,
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.cardBackground,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 24,
+      maxHeight: '70%',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    modalDate: {
+      fontSize: 14,
+      color: colors.secondaryText,
+      marginTop: 4,
+    },
+    closeButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.inputBackground,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    streakItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.inputBackground,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      borderLeftWidth: 4,
+    },
+    streakItemText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      flex: 1,
+    },
+    streakItemCount: {
+      fontSize: 14,
+      color: colors.secondaryText,
+      marginLeft: 8,
     },
   });
 
@@ -87,7 +161,7 @@ export default function MiniCalendarScreen() {
           const streakCount = streaks.filter(s => s.doneDates.includes(dateString)).length;
           
           return (
-            <View
+            <Pressable
               key={index}
               style={[
                 styles.dayBox,
@@ -100,12 +174,14 @@ export default function MiniCalendarScreen() {
                 },
                 isToday && { borderWidth: 2, borderColor: colors.text },
               ]}
+              onPress={() => handleDatePress(date)}
+              disabled={!done}
             >
               <Text style={dynamicStyles.dayText}>{date.getDate()}</Text>
               {streakCount > 1 && (
                 <Text style={[dynamicStyles.streakCountBadge, { color: colors.text }]}>{streakCount}</Text>
               )}
-            </View>
+            </Pressable>
           );
         })}
       </View>
@@ -129,6 +205,59 @@ export default function MiniCalendarScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Day Detail Modal */}
+      <Modal
+        visible={showModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowModal(false)}
+      >
+        <Pressable
+          style={dynamicStyles.modalOverlay}
+          onPress={() => setShowModal(false)}
+        >
+          <Pressable
+            style={dynamicStyles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={dynamicStyles.modalHeader}>
+              <View>
+                <Text style={dynamicStyles.modalTitle}>Completed Streaks</Text>
+                {selectedDate && (
+                  <Text style={dynamicStyles.modalDate}>
+                    {selectedDate.toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </Text>
+                )}
+              </View>
+              <Pressable
+                style={dynamicStyles.closeButton}
+                onPress={() => setShowModal(false)}
+              >
+                <IconSymbol name="xmark" size={16} color={colors.secondaryText} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {selectedDate && getStreaksForDate(selectedDate).map((streak) => (
+                <View
+                  key={streak.id}
+                  style={[dynamicStyles.streakItem, { borderLeftColor: streak.color }]}
+                >
+                  <Text style={dynamicStyles.streakItemText}>{streak.name}</Text>
+                  <Text style={dynamicStyles.streakItemCount}>
+                    🔥 {streak.streak} days
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
